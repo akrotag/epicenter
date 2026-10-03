@@ -139,12 +139,15 @@ export type LocalModelConfig =
 	| MoonshineModelConfig;
 
 /**
- * Checks if a model file size is valid (at least 90% of expected size).
+ * Checks if a model file size is within 10% of its expected size.
  * Used to detect corrupted or incomplete downloads.
  */
 export function isModelFileSizeValid(
 	actualBytes: number,
 	expectedBytes: number,
 ): boolean {
-	return actualBytes >= expectedBytes * 0.9;
+	return (
+		actualBytes >= expectedBytes * 0.9 &&
+		actualBytes <= expectedBytes * 1.1
+	);
 }

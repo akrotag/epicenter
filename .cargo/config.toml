@@ -1,0 +1,4 @@
+[env]
+# whisper-rs-sys 0.11.1 forwards CMAKE_* variables, but ignores GGML_* variables.
+# Cargo resolves this path from the repository root, including in Tauri builds.
+CMAKE_PROJECT_INCLUDE = { value = ".cargo/portable-whisper.cmake", relative = true, force = true }

@@ -17,6 +17,7 @@
 		exists,
 		mkdir,
 		remove,
+		rename,
 		stat,
 		writeFile,
 	} from '@tauri-apps/plugin-fs';
@@ -38,6 +39,7 @@
 		| { type: 'active' };
 
 	let modelState = $state<ModelState>({ type: 'not-downloaded' });
+	let isDownloading = $state(false);
 
 	/**
 	 * Calculates the destination path where this model will be downloaded and stored,
@@ -142,10 +144,12 @@
 	});
 
 	async function refreshStatus() {
+		if (isDownloading) return;
 		await tryAsync({
 			try: async () => {
 				const path = await ensureModelDestinationPath();
 				const isValid = await isModelValid(path);
+				if (isDownloading) return;
 
 				if (!isValid) {
 					modelState = { type: 'not-downloaded' };
@@ -160,14 +164,15 @@
 				modelState = isActive ? { type: 'active' } : { type: 'ready' };
 			},
 			catch: () => {
-				modelState = { type: 'not-downloaded' };
+				if (!isDownloading) modelState = { type: 'not-downloaded' };
 				return Ok(undefined);
 			},
 		});
 	}
 
 	async function downloadModel() {
-		if (modelState.type === 'downloading') return;
+		if (isDownloading) return;
+		isDownloading = true;
 
 		modelState = { type: 'downloading', progress: 0 };
 
@@ -194,8 +199,9 @@
 						throw new Error('Failed to read response body');
 					}
 
-					// Create or truncate the file first
-					await writeFile(filePath, new Uint8Array());
+					// Publish only a complete file; readers never see a partial download.
+					const temporaryPath = `${filePath}.${crypto.randomUUID()}.part`;
+					await writeFile(temporaryPath, new Uint8Array());
 
 					let downloadedBytes = 0;
 
@@ -204,7 +210,7 @@
 						if (done) break;
 
 						// Write each chunk directly to disk using append mode
-						await writeFile(filePath, value, { append: true });
+						await writeFile(temporaryPath, value, { append: true });
 
 						downloadedBytes += value.length;
 						const progress = Math.round((downloadedBytes / totalBytes) * 100);
@@ -212,24 +218,24 @@
 					}
 
 					// Validate download completeness
-					if (downloadedBytes < totalBytes) {
-						await remove(filePath);
+					const fileStats = await stat(temporaryPath);
+					if (downloadedBytes !== totalBytes || fileStats.size !== downloadedBytes) {
+						await remove(temporaryPath);
 						const downloadedMB = Math.round(downloadedBytes / 1_000_000);
 						const expectedMB = Math.round(totalBytes / 1_000_000);
 						throw new Error(
-							`Download incomplete: received ${downloadedMB}MB but expected ${expectedMB}MB. Please check your network connection and try again.`,
+							`Download size mismatch: received ${downloadedMB}MB but expected ${expectedMB}MB. Please check your network connection and try again.`,
 						);
 					}
+					await rename(temporaryPath, filePath);
 				};
 
 				const path = await ensureModelDestinationPath();
 
 				// Check if already exists
-				await refreshStatus();
-				if (modelState.type === 'ready' || modelState.type === 'active') {
-					if (modelState.type === 'ready') {
-						await activateModel();
-					}
+				if (await isModelValid(path)) {
+					await activateModel();
+					modelState = { type: 'active' };
 					toast.success('Model already downloaded and activated');
 					return;
 				}
@@ -294,6 +300,7 @@
 				return Ok(undefined);
 			},
 		});
+		isDownloading = false;
 	}
 
 	async function activateModel() {
@@ -359,7 +366,7 @@
 	</div>
 
 	<div class="flex items-center gap-2">
-		{#if modelState.type === 'downloading'}
+		{#if isDownloading}
 			<div class="flex items-center gap-2 min-w-[120px]">
 				<Spinner />
 				<span class="text-sm font-medium">{modelState.progress}%</span>

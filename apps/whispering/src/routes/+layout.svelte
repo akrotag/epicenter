@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onNavigate } from '$app/navigation';
+	import { IS_LINUX } from '$lib/constants/platform';
 	import { queryClient } from '$lib/query/client';
 	import { QueryClientProvider } from '@tanstack/svelte-query';
 	import { SvelteQueryDevtools } from '@tanstack/svelte-query-devtools';
@@ -27,6 +28,9 @@
 	} satisfies ToasterProps;
 
 	onNavigate((navigation) => {
+		// WebKitGTK can enter accelerated compositing for a view transition even
+		// with DMA-BUF disabled, then crash in AcceleratedBackingStore::update.
+		if (IS_LINUX && window.__TAURI_INTERNALS__) return;
 		if (!document.startViewTransition) return;
 
 		return new Promise((resolve) => {

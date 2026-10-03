@@ -186,3 +186,55 @@ Contributors coordinate and share ideas in our Discord community.
 <p align="center">
   <sub>Built with ❤️ for data ownership, local-first, and open-source</sub>
 </p>
+
+## Correctifs de ce fork : Whispering 7.11 sur Linux
+
+La branche `codex/fix-whispering-linux-crash` est basée sur le tag `v7.11.0`.
+Elle contient les correctifs testés sur Ubuntu dans une VM KVM avec un Intel
+Core i5-12450H. Ils ne sont pas encore portés sur la version actuelle de `main`.
+
+### Crashs au démarrage et pendant la navigation
+
+Sous Wayland, le rendu DMA-BUF de WebKitGTK est désactivé avant le démarrage du
+runtime, sauf si l’utilisateur a déjà défini `WEBKIT_DISABLE_DMABUF_RENDERER`.
+Les animations View Transitions sont également désactivées dans l’application
+Linux : un clic sur Accueil ou Paramètres pouvait faire planter WebKitGTK même
+avec DMA-BUF désactivé. Ces changements répondent au problème signalé dans
+[l’issue #1316](https://github.com/EpicenterHQ/epicenter/issues/1316) et aux crashs
+observés pendant le diagnostic local.
+
+La compilation de whisper.cpp/GGML n’utilise plus `-march=native` sur Linux.
+Sur x86-64, les instructions AVX, AVX2, FMA, F16C, AVX-512 et AMX sont désactivées
+par défaut pour éviter qu’un binaire hérite d’instructions propres à la machine
+de compilation. Le binaire original utilisait AVX-512 avant même `main()` et
+échouait sur un processeur qui ne le prenait pas en charge.
+
+### Téléchargement des modèles
+
+Un verrou empêche plusieurs téléchargements simultanés du même composant.
+Chaque téléchargement écrit dans un fichier temporaire unique, vérifie le nombre
+d’octets reçus et la taille sur disque, puis renomme le fichier vers sa destination.
+Un modèle existant n’est donc plus écrasé par un téléchargement partiel. Le contrôle
+de taille des modèles existants rejette aussi les fichiers dépassant 110 % de
+la taille attendue. Ces contrôles portent sur la taille, pas sur une empreinte
+cryptographique du contenu.
+
+### Optimisation CPU facultative
+
+Pour un processeur dont le support AVX2/FMA/F16C a été vérifié, la compilation
+peut activer `WHISPER_CPU_AVX2=ON`. AVX-512, AMX et `-march=native` restent
+désactivés. `WHISPER_CPU_ONLY=ON` désactive Vulkan ; cette option évite d’utiliser
+llvmpipe comme GPU logiciel dans une VM. Ces options ne sont pas activées par
+défaut et une compilation AVX2 ne convient pas aux processeurs plus anciens.
+
+Sur la machine testée, l’encodeur du modèle Small avec quatre threads est passé
+de 33,8 s à 4,3 s après l’activation d’AVX2/FMA. Il s’agit d’une mesure de
+l’encodeur, pas du temps d’une transcription complète. Le nombre de threads de
+transcription reste inchangé ; huit threads n’ont pas apporté de gain important
+sur cette machine.
+
+Des tests de régression couvrent le démarrage, les options CPU, la navigation
+et les téléchargements. Un workflow GitHub Actions les exécute. Les causes,
+les limites et les commandes de compilation, dont la compilation avec une seule
+tâche pour limiter la mémoire, sont détaillées dans le
+[guide de diagnostic Linux](apps/whispering/docs/linux-startup-crashes.md).
