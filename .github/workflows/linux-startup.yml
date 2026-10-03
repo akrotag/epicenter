@@ -1,0 +1,33 @@
+name: Linux startup regression tests
+
+on:
+  push:
+    paths:
+      - 'apps/epicenter/src-tauri/src/main.rs'
+      - 'apps/whispering/tests/linux-startup.test.py'
+      - 'apps/whispering/src/routes/+layout.svelte'
+      - 'apps/whispering/tests/navigation.test.js'
+      - '.github/workflows/linux-startup.yml'
+  pull_request:
+    paths:
+      - 'apps/epicenter/src-tauri/src/main.rs'
+      - 'apps/whispering/tests/linux-startup.test.py'
+      - 'apps/whispering/src/routes/+layout.svelte'
+      - 'apps/whispering/tests/navigation.test.js'
+      - '.github/workflows/linux-startup.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  startup:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python3 apps/whispering/tests/linux-startup.test.py
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install
+      - run: bun test apps/whispering/tests/navigation.test.js

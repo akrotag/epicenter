@@ -2,6 +2,8 @@
 	import { Toaster } from '@epicenter/ui/sonner';
 	import { ModeWatcher } from 'mode-watcher';
 	import { onNavigate } from '$app/navigation';
+	import { os } from '#platform/os';
+	import { tauri } from '#platform/tauri';
 	import { FlushEditsOnHide } from '@epicenter/svelte';
 	import '@epicenter/ui/app.css';
 	// Whispering's brand overrides, layered after the shared theme so they win.
@@ -16,6 +18,8 @@
 	// open SQLite.
 
 	onNavigate((navigation) => {
+		// WebKitGTK view transitions can crash even with DMA-BUF disabled.
+		if (os.isLinux && tauri) return;
 		if (!document.startViewTransition) return;
 		// We deliberately lengthen the morph below, so honor reduced-motion by
 		// skipping the transition entirely (snap to the new page) rather than

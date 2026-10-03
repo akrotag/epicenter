@@ -251,3 +251,36 @@ See the root [LICENSE](LICENSE), [FINANCIAL_SUSTAINABILITY.md](FINANCIAL_SUSTAIN
 <p align="center">
   <sub>Your data outlives the app that wrote it. Local-first, open source, built on Yjs.</sub>
 </p>
+
+## Correctifs Linux de ce fork
+
+Les protections contre les crashs WebKitGTK sont intégrées à `main`, dans
+l’architecture actuelle où Epicenter héberge Whispering. Sous Wayland, le
+rendu DMA-BUF est désactivé avant le démarrage du runtime, sauf si
+`WEBKIT_DISABLE_DMABUF_RENDERER` est déjà défini. Les View Transitions sont
+également désactivées dans la fenêtre Linux de Whispering pour éviter le crash
+observé en cliquant sur Accueil ou Paramètres. Les autres plateformes conservent
+leurs transitions et le respect de la préférence de réduction des animations.
+Voir [l’issue #1316](https://github.com/EpicenterHQ/epicenter/issues/1316) et le
+[guide de diagnostic](apps/whispering/docs/linux-startup-crashes.md).
+
+La fusion conserve le moteur `transcribe-cpp` actuel. Sa compilation Linux
+utilise déjà une base x86 compatible et des modules CPU sélectionnés à
+l’exécution selon les instructions disponibles. L’ancien hook de compilation
+pour `whisper-rs-sys` n’est donc pas réintroduit.
+
+La gestion actuelle des modèles est également conservée : l’interface
+Epicenter bloque les transferts simultanés d’un même modèle ; `hf-hub` protège
+les écritures avec un verrou et télécharge dans un fichier temporaire avant
+son renommage. L’ancien composant de téléchargement et ses permissions
+filesystem ne sont pas réintroduits.
+
+Les tests de régression vérifient le choix du rendu avant le démarrage du
+runtime et la navigation Linux, les autres plateformes et la réduction des
+animations. Le workflow GitHub Actions exécute ces tests.
+
+La version autonome corrigée et optimisée pour Whispering 7.11 reste disponible
+sur la branche [`codex/fix-whispering-linux-crash`](https://github.com/akrotag/epicenter/tree/codex/fix-whispering-linux-crash).
+Les options `WHISPER_CPU_AVX2` et `WHISPER_CPU_ONLY`, ainsi que les mesures de
+performance documentées sur cette branche, concernent uniquement cette ancienne
+version. Elles ne configurent pas le nouveau moteur de `main`.
